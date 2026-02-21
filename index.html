@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analizador de Relevancia (Scopus & WoS) - Chatbots AI</title>
+    <title>Analizador de Relevancia Científica - IA y Chatbots</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,16 +17,73 @@
           0 10px 15px -3px rgba(0, 0, 0, 0.1),
           0 4px 6px -2px rgba(0, 0, 0, 0.05);
       }
-      .truncate-text {
+
+      /* Ajustes para la grilla y truncado de texto */
+      .truncate-multiline {
         display: -webkit-box;
-        -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        white-space: normal; /* Permite el salto de línea */
+        word-wrap: break-word; /* Rompe palabras largas si es necesario */
       }
+      .truncate-abstract {
+        -webkit-line-clamp: 4;
+      } /* Muestra hasta 4 líneas del resumen */
+      .truncate-title {
+        -webkit-line-clamp: 3;
+      } /* Muestra hasta 3 líneas del título */
+      .truncate-keywords {
+        -webkit-line-clamp: 2;
+      } /* Muestra hasta 2 líneas de palabras clave */
+
+      /* Forzar anchos de tabla para respetar la grilla */
+      table {
+        table-layout: fixed;
+        width: 100%;
+      }
+      /* Ajustar anchos específicos de columnas */
+      .col-rank {
+        width: 4%;
+      }
+      .col-score {
+        width: 6%;
+      }
+      .col-authors {
+        width: 10%;
+      }
+      .col-title {
+        width: 15%;
+      }
+      .col-year {
+        width: 4%;
+      }
+      .col-journal {
+        width: 10%;
+      }
+      .col-abstract {
+        width: 25%;
+      } /* Mayor espacio para el resumen */
+      .col-keywords {
+        width: 12%;
+      }
+      .col-lang {
+        width: 5%;
+      }
+      .col-type {
+        width: 5%;
+      }
+      .col-links {
+        width: 4%;
+      }
+
+      td {
+        vertical-align: top;
+      } /* Alinea el texto de las celdas arriba */
     </style>
   </head>
   <body class="bg-slate-50 min-h-screen">
-    <div class="max-w-[1400px] mx-auto px-4 py-10">
+    <div class="max-w-[1600px] mx-auto px-4 py-10">
+      <!-- Aumenté el max-w para aprovechar pantallas grandes -->
       <!-- Encabezado -->
       <div
         class="bg-white rounded-2xl p-8 mb-8 custom-shadow border border-slate-100"
@@ -97,48 +154,71 @@
         </div>
       </div>
 
-      <!-- Tabla de Resultados -->
+      <!-- Tabla de Resultados en Pantalla -->
       <div
         class="bg-white rounded-2xl overflow-hidden custom-shadow border border-slate-100"
       >
         <div class="overflow-x-auto">
           <table
             id="resultTable"
-            class="w-full text-left border-collapse min-w-[1000px]"
+            class="w-full text-left border-collapse min-w-[1200px]"
           >
             <thead>
               <tr class="bg-slate-800 text-white">
-                <th class="px-4 py-4 font-semibold uppercase text-xs">Rank</th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                <th class="col-rank px-3 py-4 font-semibold uppercase text-xs">
+                  Rank
+                </th>
+                <th
+                  class="col-score px-3 py-4 font-semibold uppercase text-xs text-center"
+                >
                   Puntaje
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                <th
+                  class="col-authors px-3 py-4 font-semibold uppercase text-xs"
+                >
                   Autores
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
+                <th class="col-title px-3 py-4 font-semibold uppercase text-xs">
                   Título
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">Año</th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                <th
+                  class="col-year px-3 py-4 font-semibold uppercase text-xs text-center"
+                >
+                  Año
+                </th>
+                <th
+                  class="col-journal px-3 py-4 font-semibold uppercase text-xs"
+                >
                   Revista / Fuente
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
+                <th
+                  class="col-abstract px-3 py-4 font-semibold uppercase text-xs"
+                >
                   Resumen
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Palabras Clave
+                <th
+                  class="col-keywords px-3 py-4 font-semibold uppercase text-xs"
+                >
+                  Palabras Claves
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                <th
+                  class="col-lang px-3 py-4 font-semibold uppercase text-xs text-center"
+                >
                   Idioma
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Tipo Doc
+                <th
+                  class="col-type px-3 py-4 font-semibold uppercase text-xs text-center"
+                >
+                  Tipo Doc.
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">Link</th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">DOI</th>
+                <th
+                  class="col-links px-3 py-4 font-semibold uppercase text-xs text-center"
+                >
+                  Enlaces
+                </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-200">
               <!-- Los datos se cargarán aquí -->
             </tbody>
           </table>
@@ -168,6 +248,7 @@
     <script>
       let processedData = [];
 
+      // Buscador seguro de columnas
       function getColumnValue(item, ...columnNames) {
         for (let colName of columnNames) {
           const key = Object.keys(item).find(
@@ -178,6 +259,40 @@
           }
         }
         return "";
+      }
+
+      // --- DICCIONARIO DE TRADUCCIÓN ---
+      function translateData(text, type) {
+        if (!text) return "N/D";
+        const lower = text.toLowerCase().trim();
+
+        if (type === "language") {
+          if (lower.includes("english")) return "Inglés";
+          if (lower.includes("spanish")) return "Español";
+          if (lower.includes("portuguese")) return "Portugués";
+          if (lower.includes("french")) return "Francés";
+          if (lower.includes("german")) return "Alemán";
+          if (lower.includes("chinese")) return "Chino";
+          return text;
+        }
+
+        if (type === "document") {
+          if (lower.includes("article") || lower === "art") return "Artículo";
+          if (lower.includes("review")) return "Revisión";
+          if (
+            lower.includes("conference paper") ||
+            lower.includes("proceedings")
+          )
+            return "Artículo de Conferencia";
+          if (lower.includes("book chapter")) return "Capítulo de Libro";
+          if (lower.includes("book")) return "Libro";
+          if (lower.includes("editorial")) return "Editorial";
+          if (lower.includes("letter")) return "Carta";
+          if (lower.includes("note")) return "Nota";
+          if (lower.includes("erratum")) return "Fe de Erratas";
+          return text;
+        }
+        return text;
       }
 
       function processData() {
@@ -192,10 +307,9 @@
         const fileName = file.name.toLowerCase();
 
         if (fileName.endsWith(".csv")) {
-          // Configuración mejorada de PapaParse para evitar que se rompa con Abstracts largos
           Papa.parse(file, {
             header: true,
-            dynamicTyping: false, // Mejor tratar todo como texto al principio
+            dynamicTyping: false,
             skipEmptyLines: true,
             quoteChar: '"',
             escapeChar: '"',
@@ -210,7 +324,6 @@
             const workbook = XLSX.read(data, { type: "array" });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {
               defval: "",
             });
@@ -271,13 +384,12 @@
         processedData = rawData.map((item) => {
           let score = 0;
 
-          // Extracción con sinónimos de WoS y Scopus
+          // Extraer con sinónimos (Scopus y WoS)
           const titleRaw = getColumnValue(
             item,
             "title",
             "article title",
           ).toString();
-          // Ahora busca en más posibles nombres para el Resumen
           const abstractRaw = getColumnValue(
             item,
             "abstract",
@@ -288,10 +400,6 @@
             item,
             "author keywords",
             "keywords",
-          ).toString();
-          const indexKeywordsRaw = getColumnValue(
-            item,
-            "index keywords",
             "keywords plus",
           ).toString();
           const sourceRaw = getColumnValue(
@@ -303,7 +411,7 @@
 
           const title = titleRaw.toLowerCase();
           const abstract = abstractRaw.toLowerCase();
-          const fullText = `${title} ${abstract} ${authKeywordsRaw.toLowerCase()} ${indexKeywordsRaw.toLowerCase()}`;
+          const fullText = `${title} ${abstract} ${authKeywordsRaw.toLowerCase()}`;
 
           let year = parseInt(getColumnValue(item, "year", "publication year"));
           if (isNaN(year)) year = 0;
@@ -350,16 +458,25 @@
               "Sin autor",
             _cleanSource: sourceRaw || "N/D",
             _cleanAbstract: abstractRaw || "Sin resumen disponible.",
-            _cleanKeywords: authKeywordsRaw || "Sin palabras clave",
-            _cleanLanguage:
+            _cleanKeywords: authKeywordsRaw || "N/D",
+            _cleanLanguage: translateData(
               getColumnValue(
                 item,
                 "language of original document",
                 "language",
-              ) || "N/D",
-            _cleanDocType:
-              getColumnValue(item, "document type", "document type(s)") ||
-              "N/D",
+                "idioma",
+              ),
+              "language",
+            ),
+            _cleanDocType: translateData(
+              getColumnValue(
+                item,
+                "document type",
+                "document type(s)",
+                "tipo de documento",
+              ),
+              "document",
+            ),
             _cleanLink: getColumnValue(item, "link", "doi link", "url") || "",
             _cleanDoi:
               getColumnValue(item, "doi", "digital object identifier") || "",
@@ -391,42 +508,70 @@
 
           const scoreColor =
             item.relevanceScore >= 130
-              ? "bg-emerald-100 text-emerald-700"
+              ? "bg-emerald-100 text-emerald-800"
               : item.relevanceScore >= 80
-                ? "bg-blue-100 text-blue-700"
-                : "bg-slate-100 text-slate-600";
+                ? "bg-blue-100 text-blue-800"
+                : "bg-slate-100 text-slate-700";
 
-          let linkHtml = `<span class="text-slate-300 text-xs italic">N/A</span>`;
+          let linkHtml = `<div class="flex flex-col gap-1 items-center">`;
           if (item._cleanLink) {
-            linkHtml = `<a href="${item._cleanLink}" target="_blank" class="text-blue-500 hover:underline text-xs font-semibold">Ver Link</a>`;
+            linkHtml += `<a href="${item._cleanLink}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline text-[11px] font-semibold bg-blue-50 px-2 py-1 rounded w-full text-center">🔗 Link</a>`;
           }
-
-          let doiHtml = `<span class="text-slate-300 text-xs italic">N/A</span>`;
           if (item._cleanDoi) {
             const isUrl = item._cleanDoi.toString().startsWith("http");
             const href = isUrl
               ? item._cleanDoi
               : `https://doi.org/${item._cleanDoi}`;
-            doiHtml = `<a href="${href}" target="_blank" class="text-emerald-500 hover:underline text-xs font-semibold">Ver DOI</a>`;
+            linkHtml += `<a href="${href}" target="_blank" class="text-emerald-600 hover:text-emerald-800 hover:underline text-[11px] font-semibold bg-emerald-50 px-2 py-1 rounded w-full text-center">📄 DOI</a>`;
+          }
+          linkHtml += `</div>`;
+
+          if (!item._cleanLink && !item._cleanDoi) {
+            linkHtml = `<span class="text-slate-400 text-xs italic block text-center">N/A</span>`;
           }
 
+          // Asegurar que el abstract y keywords sean strings y limpiar espacios extra
+          const safeAbstract = (
+            item._cleanAbstract || "Sin resumen disponible."
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+          const safeKeywords = (item._cleanKeywords || "N/D")
+            .replace(/\s+/g, " ")
+            .trim();
+          const safeAuthors = (item._cleanAuthors || "Sin autor")
+            .replace(/\s+/g, " ")
+            .trim();
+          const safeJournal = (item._cleanSource || "N/D")
+            .replace(/\s+/g, " ")
+            .trim();
+
           row.innerHTML = `
-                    <td class="px-4 py-4 text-sm font-bold text-slate-400">#${index + 1}</td>
-                    <td class="px-4 py-4">
-                        <span class="px-3 py-1.5 rounded-md text-xs font-bold ${scoreColor} shadow-sm border border-white whitespace-nowrap">
+                    <td class="px-3 py-4 text-sm font-bold text-slate-400 text-center">#${index + 1}</td>
+                    <td class="px-3 py-4 text-center">
+                        <span class="inline-block px-2 py-1 rounded text-xs font-bold ${scoreColor}">
                             ${item.relevanceScore} pts
                         </span>
                     </td>
-                    <td class="px-4 py-4 text-xs text-slate-600 truncate max-w-[120px]" title="${item._cleanAuthors}">${item._cleanAuthors}</td>
-                    <td class="px-4 py-4 text-sm font-semibold text-slate-800 line-clamp-3" title="${item._cleanTitle}">${item._cleanTitle}</td>
-                    <td class="px-4 py-4 text-sm text-slate-600 font-bold">${item._cleanYear > 0 ? item._cleanYear : "N/D"}</td>
-                    <td class="px-4 py-4 text-xs font-medium text-slate-700 line-clamp-2" title="${item._cleanSource}">${item._cleanSource}</td>
-                    <td class="px-4 py-4 text-xs text-slate-500 truncate-text" title="${item._cleanAbstract}">${item._cleanAbstract}</td>
-                    <td class="px-4 py-4 text-xs text-blue-600 truncate max-w-[120px]" title="${item._cleanKeywords}">${item._cleanKeywords}</td>
-                    <td class="px-4 py-4 text-xs text-slate-600">${item._cleanLanguage}</td>
-                    <td class="px-4 py-4 text-xs text-slate-600">${item._cleanDocType}</td>
-                    <td class="px-4 py-4">${linkHtml}</td>
-                    <td class="px-4 py-4">${doiHtml}</td>
+                    <td class="px-3 py-4 text-xs text-slate-600">
+                        <div class="truncate-multiline" style="-webkit-line-clamp: 3;" title="${safeAuthors}">${safeAuthors}</div>
+                    </td>
+                    <td class="px-3 py-4 text-sm font-semibold text-slate-800">
+                        <div class="truncate-multiline truncate-title" title="${item._cleanTitle}">${item._cleanTitle}</div>
+                    </td>
+                    <td class="px-3 py-4 text-sm text-slate-600 font-bold text-center">${item._cleanYear > 0 ? item._cleanYear : "N/D"}</td>
+                    <td class="px-3 py-4 text-xs font-medium text-slate-700">
+                         <div class="truncate-multiline" style="-webkit-line-clamp: 2;" title="${safeJournal}">${safeJournal}</div>
+                    </td>
+                    <td class="px-3 py-4 text-xs text-slate-600 text-justify">
+                        <div class="truncate-multiline truncate-abstract" title="${safeAbstract}">${safeAbstract}</div>
+                    </td>
+                    <td class="px-3 py-4 text-xs text-blue-700 font-medium">
+                        <div class="truncate-multiline truncate-keywords" title="${safeKeywords}">${safeKeywords}</div>
+                    </td>
+                    <td class="px-3 py-4 text-xs text-slate-600 text-center">${item._cleanLanguage}</td>
+                    <td class="px-3 py-4 text-xs text-slate-600 text-center">${item._cleanDocType}</td>
+                    <td class="px-3 py-4">${linkHtml}</td>
                 `;
           tbody.appendChild(row);
         });
@@ -447,9 +592,8 @@
         if (processedData.length === 0) return;
 
         const exportData = processedData.map((item, idx) => {
-          // Generamos un objeto limpio y traducido para la exportación a Excel
           return {
-            "Ranking de Relevancia": idx + 1,
+            "Posición (Ranking)": idx + 1,
             "Puntaje de IA": item.relevanceScore,
             Autores: item._cleanAuthors,
             Título: item._cleanTitle,
@@ -468,7 +612,7 @@
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Ranking");
 
-        XLSX.writeFile(workbook, "Ranking_Consolidado_Filtrado_ES.xlsx");
+        XLSX.writeFile(workbook, "Ranking_Traducido_Filtrado.xlsx");
       }
     </script>
   </body>
