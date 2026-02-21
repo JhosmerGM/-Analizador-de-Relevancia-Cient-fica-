@@ -3,9 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Analizador de Relevancia Scopus - Chatbots AI</title>
+    <title>Analizador de Relevancia (Scopus & WoS) - Chatbots AI</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- Agregamos SheetJS para poder leer y exportar Excel nativamente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -18,7 +17,6 @@
           0 10px 15px -3px rgba(0, 0, 0, 0.1),
           0 4px 6px -2px rgba(0, 0, 0, 0.05);
       }
-      /* Tooltip simple para ver el abstract completo al pasar el ratón */
       .truncate-text {
         display: -webkit-box;
         -webkit-line-clamp: 3;
@@ -47,7 +45,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
           <div class="space-y-2">
             <label class="block text-sm font-semibold text-slate-700"
-              >Subir nuevo archivo (Excel o CSV)</label
+              >Subir archivo (Soporta Scopus y Web of Science)</label
             >
             <input
               type="file"
@@ -115,26 +113,26 @@
                   Puntaje
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Authors
+                  Autores
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
-                  Title
+                  Título
                 </th>
-                <th class="px-4 py-4 font-semibold uppercase text-xs">Year</th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">Año</th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Journal
+                  Revista / Fuente
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
-                  Abstract
+                  Resumen
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Keywords
+                  Palabras Clave
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Language
+                  Idioma
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">
-                  Doc Type
+                  Tipo Doc
                 </th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">Link</th>
                 <th class="px-4 py-4 font-semibold uppercase text-xs">DOI</th>
@@ -159,7 +157,10 @@
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             ></path>
           </svg>
-          <p>Sube tu archivo Excel o CSV para generar el ranking automático</p>
+          <p>
+            Sube tu archivo (Scopus o Web of Science) para generar el ranking
+            automático
+          </p>
         </div>
       </div>
     </div>
@@ -167,12 +168,16 @@
     <script>
       let processedData = [];
 
-      // Función auxiliar para buscar el valor de una columna ignorando mayúsculas/minúsculas y espacios
-      function getColumnValue(item, columnName) {
-        const key = Object.keys(item).find(
-          (k) => k.trim().toLowerCase() === columnName.toLowerCase(),
-        );
-        return key && item[key] !== null ? item[key] : "";
+      function getColumnValue(item, ...columnNames) {
+        for (let colName of columnNames) {
+          const key = Object.keys(item).find(
+            (k) => k.trim().toLowerCase() === colName.toLowerCase(),
+          );
+          if (key && item[key] !== null && item[key] !== "") {
+            return item[key];
+          }
+        }
+        return "";
       }
 
       function processData() {
@@ -186,19 +191,19 @@
 
         const fileName = file.name.toLowerCase();
 
-        // Si es CSV usamos PapaParse
         if (fileName.endsWith(".csv")) {
+          // Configuración mejorada de PapaParse para evitar que se rompa con Abstracts largos
           Papa.parse(file, {
             header: true,
-            dynamicTyping: true,
+            dynamicTyping: false, // Mejor tratar todo como texto al principio
             skipEmptyLines: true,
+            quoteChar: '"',
+            escapeChar: '"',
             complete: function (results) {
               analyzeData(results.data);
             },
           });
-        }
-        // Si es Excel usamos SheetJS
-        else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+        } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
           const reader = new FileReader();
           reader.onload = function (e) {
             const data = new Uint8Array(e.target.result);
@@ -206,7 +211,6 @@
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
 
-            // Convertir la hoja de Excel a un array de objetos
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {
               defval: "",
             });
@@ -228,7 +232,6 @@
           return;
         }
 
-        // Criterios de evaluación basados en tu investigación
         const keywords = {
           high: [
             "chatbot",
@@ -268,27 +271,43 @@
         processedData = rawData.map((item) => {
           let score = 0;
 
-          // Extraer valores crudos
-          const titleRaw = getColumnValue(item, "title").toString();
-          const abstractRaw = getColumnValue(item, "abstract").toString();
+          // Extracción con sinónimos de WoS y Scopus
+          const titleRaw = getColumnValue(
+            item,
+            "title",
+            "article title",
+          ).toString();
+          // Ahora busca en más posibles nombres para el Resumen
+          const abstractRaw = getColumnValue(
+            item,
+            "abstract",
+            "abstract text",
+            "resumen",
+          ).toString();
           const authKeywordsRaw = getColumnValue(
             item,
             "author keywords",
+            "keywords",
           ).toString();
           const indexKeywordsRaw = getColumnValue(
             item,
             "index keywords",
+            "keywords plus",
           ).toString();
-          const sourceRaw = getColumnValue(item, "source title").toString();
+          const sourceRaw = getColumnValue(
+            item,
+            "source title",
+            "journal",
+            "journal title",
+          ).toString();
 
           const title = titleRaw.toLowerCase();
           const abstract = abstractRaw.toLowerCase();
           const fullText = `${title} ${abstract} ${authKeywordsRaw.toLowerCase()} ${indexKeywordsRaw.toLowerCase()}`;
 
-          let year = parseInt(getColumnValue(item, "year"));
+          let year = parseInt(getColumnValue(item, "year", "publication year"));
           if (isNaN(year)) year = 0;
 
-          // 1. Puntaje por Palabras Clave
           keywords.high.forEach((word) => {
             if (fullText.includes(word)) score += 25;
             if (title.includes(word)) score += 20;
@@ -302,7 +321,6 @@
             if (title.includes(word)) score += 10;
           });
 
-          // 2. Filtro Temporal (2021-2025)
           if (year >= 2021 && year <= 2025) {
             score += 100;
           } else if (year >= 2018) {
@@ -311,33 +329,44 @@
             score -= 50;
           }
 
-          // 3. Bono por citaciones
-          const citedBy = parseInt(getColumnValue(item, "cited by"));
+          const citedBy = parseInt(
+            getColumnValue(
+              item,
+              "cited by",
+              "times cited, wos core",
+              "times cited, all databases",
+            ),
+          );
           if (!isNaN(citedBy)) {
             score += Math.min(citedBy / 2, 30);
           }
 
           return {
             ...item,
-            // Variables temporales para la vista web (empiezan con _)
             _cleanTitle: titleRaw || "Sin título",
             _cleanYear: year,
-            _cleanAuthors: getColumnValue(item, "authors") || "Sin autor",
+            _cleanAuthors:
+              getColumnValue(item, "authors", "author full names") ||
+              "Sin autor",
             _cleanSource: sourceRaw || "N/D",
             _cleanAbstract: abstractRaw || "Sin resumen disponible.",
             _cleanKeywords: authKeywordsRaw || "Sin palabras clave",
             _cleanLanguage:
-              getColumnValue(item, "language of original document") ||
-              getColumnValue(item, "language") ||
+              getColumnValue(
+                item,
+                "language of original document",
+                "language",
+              ) || "N/D",
+            _cleanDocType:
+              getColumnValue(item, "document type", "document type(s)") ||
               "N/D",
-            _cleanDocType: getColumnValue(item, "document type") || "N/D",
-            _cleanLink: getColumnValue(item, "link") || "",
-            _cleanDoi: getColumnValue(item, "doi") || "",
+            _cleanLink: getColumnValue(item, "link", "doi link", "url") || "",
+            _cleanDoi:
+              getColumnValue(item, "doi", "digital object identifier") || "",
             relevanceScore: Math.round(score),
           };
         });
 
-        // Filtrar y ordenar: de MÁS relacionado a MENOS relacionado
         processedData = processedData.filter(
           (d) => d._cleanTitle !== "Sin título",
         );
@@ -417,36 +446,29 @@
       function downloadResult() {
         if (processedData.length === 0) return;
 
-        // Preparamos los datos para exportar
         const exportData = processedData.map((item, idx) => {
-          // Removemos nuestras variables temporales de limpieza que empiezan con '_'
-          const cleanItem = { ...item };
-          delete cleanItem._cleanTitle;
-          delete cleanItem._cleanYear;
-          delete cleanItem._cleanAuthors;
-          delete cleanItem._cleanDoi;
-          delete cleanItem._cleanSource;
-          delete cleanItem._cleanAbstract;
-          delete cleanItem._cleanKeywords;
-          delete cleanItem._cleanLanguage;
-          delete cleanItem._cleanDocType;
-          delete cleanItem._cleanLink;
-          delete cleanItem.relevanceScore;
-
-          // Orden correcto: más relacionado al principio
+          // Generamos un objeto limpio y traducido para la exportación a Excel
           return {
-            Ranking_Relevancia: idx + 1,
-            Puntaje_IA: item.relevanceScore,
-            ...cleanItem,
+            "Ranking de Relevancia": idx + 1,
+            "Puntaje de IA": item.relevanceScore,
+            Autores: item._cleanAuthors,
+            Título: item._cleanTitle,
+            Año: item._cleanYear > 0 ? item._cleanYear : "N/D",
+            "Revista / Fuente": item._cleanSource,
+            Resumen: item._cleanAbstract,
+            "Palabras Clave": item._cleanKeywords,
+            Idioma: item._cleanLanguage,
+            "Tipo de Documento": item._cleanDocType,
+            Enlace: item._cleanLink,
+            DOI: item._cleanDoi,
           };
         });
 
-        // Usamos SheetJS para exportar directamente a Excel (.xlsx)
         const worksheet = XLSX.utils.json_to_sheet(exportData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Ranking");
 
-        XLSX.writeFile(workbook, "Ranking_Scopus_Filtrado.xlsx");
+        XLSX.writeFile(workbook, "Ranking_Consolidado_Filtrado_ES.xlsx");
       }
     </script>
   </body>
