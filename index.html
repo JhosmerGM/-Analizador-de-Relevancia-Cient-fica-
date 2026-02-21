@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analizador de Relevancia Scopus - Chatbots AI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Agregamos SheetJS para poder leer y exportar Excel nativamente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      .custom-shadow {
+        box-shadow:
+          0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      }
+      /* Tooltip simple para ver el abstract completo al pasar el ratón */
+      .truncate-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 min-h-screen">
+    <div class="max-w-[1400px] mx-auto px-4 py-10">
+      <!-- Encabezado -->
+      <div
+        class="bg-white rounded-2xl p-8 mb-8 custom-shadow border border-slate-100"
+      >
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">
+          Analizador de Relevancia Científica
+        </h1>
+        <p class="text-slate-600 mb-6">
+          Herramienta optimizada para el estudio:
+          <span class="italic font-medium text-blue-600"
+            >"Aplicación de Chatbots con IA en Plataformas Web
+            (2021-2025)"</span
+          >
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700"
+              >Subir nuevo archivo (Excel o CSV)</label
+            >
+            <input
+              type="file"
+              id="csvFile"
+              accept=".csv, .xlsx, .xls"
+              class="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+            />
+          </div>
+          <div class="flex gap-3">
+            <button
+              onclick="processData()"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg shadow-blue-200"
+            >
+              Analizar y Ordenar
+            </button>
+            <button
+              id="downloadBtn"
+              onclick="downloadResult()"
+              class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-lg shadow-emerald-200"
+            >
+              Descargar Excel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estadísticas Rápidas -->
+      <div
+        id="statsContainer"
+        class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+      >
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+          <p class="text-sm text-slate-500 uppercase tracking-wider font-bold">
+            Total Procesados
+          </p>
+          <p id="totalCount" class="text-3xl font-bold text-slate-800">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+          <p class="text-sm text-slate-500 uppercase tracking-wider font-bold">
+            Alta Relevancia
+          </p>
+          <p id="highRelCount" class="text-3xl font-bold text-emerald-600">0</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+          <p class="text-sm text-slate-500 uppercase tracking-wider font-bold">
+            Rango 2021-2025
+          </p>
+          <p id="yearMatchCount" class="text-3xl font-bold text-blue-600">0</p>
+        </div>
+      </div>
+
+      <!-- Tabla de Resultados -->
+      <div
+        class="bg-white rounded-2xl overflow-hidden custom-shadow border border-slate-100"
+      >
+        <div class="overflow-x-auto">
+          <table
+            id="resultTable"
+            class="w-full text-left border-collapse min-w-[1000px]"
+          >
+            <thead>
+              <tr class="bg-slate-800 text-white">
+                <th class="px-4 py-4 font-semibold uppercase text-xs">Rank</th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Puntaje
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Authors
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
+                  Title
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">Year</th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Journal
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs w-1/5">
+                  Abstract
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Keywords
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Language
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">
+                  Doc Type
+                </th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">Link</th>
+                <th class="px-4 py-4 font-semibold uppercase text-xs">DOI</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <!-- Los datos se cargarán aquí -->
+            </tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="p-20 text-center text-slate-400">
+          <svg
+            class="w-16 h-16 mx-auto mb-4 opacity-20"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            ></path>
+          </svg>
+          <p>Sube tu archivo Excel o CSV para generar el ranking automático</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let processedData = [];
+
+      // Función auxiliar para buscar el valor de una columna ignorando mayúsculas/minúsculas y espacios
+      function getColumnValue(item, columnName) {
+        const key = Object.keys(item).find(
+          (k) => k.trim().toLowerCase() === columnName.toLowerCase(),
+        );
+        return key && item[key] !== null ? item[key] : "";
+      }
+
+      function processData() {
+        const fileInput = document.getElementById("csvFile");
+        const file = fileInput.files[0];
+
+        if (!file) {
+          alert("Por favor, selecciona un archivo (Excel o CSV) primero.");
+          return;
+        }
+
+        const fileName = file.name.toLowerCase();
+
+        // Si es CSV usamos PapaParse
+        if (fileName.endsWith(".csv")) {
+          Papa.parse(file, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function (results) {
+              analyzeData(results.data);
+            },
+          });
+        }
+        // Si es Excel usamos SheetJS
+        else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array" });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+
+            // Convertir la hoja de Excel a un array de objetos
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+              defval: "",
+            });
+            analyzeData(jsonData);
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          alert(
+            "Formato no soportado. Por favor, sube un archivo .xlsx, .xls o .csv",
+          );
+        }
+      }
+
+      function analyzeData(rawData) {
+        if (rawData.length === 0) {
+          alert(
+            "El archivo parece estar vacío o no se pudo leer correctamente.",
+          );
+          return;
+        }
+
+        // Criterios de evaluación basados en tu investigación
+        const keywords = {
+          high: [
+            "chatbot",
+            "chatbots",
+            "conversational agent",
+            "intelligent assistant",
+            "artificial intelligence",
+            "ia",
+            "ai",
+            "llm",
+            "virtual assistant",
+            "generative ai",
+          ],
+          medium: [
+            "web",
+            "platform",
+            "online",
+            "internet",
+            "website",
+            "interface",
+            "web-based",
+          ],
+          context: [
+            "implementation",
+            "strategy",
+            "performance",
+            "trends",
+            "metrics",
+            "desempeño",
+            "estrategias",
+            "tendencias",
+            "evaluation",
+            "framework",
+          ],
+        };
+
+        processedData = rawData.map((item) => {
+          let score = 0;
+
+          // Extraer valores crudos
+          const titleRaw = getColumnValue(item, "title").toString();
+          const abstractRaw = getColumnValue(item, "abstract").toString();
+          const authKeywordsRaw = getColumnValue(
+            item,
+            "author keywords",
+          ).toString();
+          const indexKeywordsRaw = getColumnValue(
+            item,
+            "index keywords",
+          ).toString();
+          const sourceRaw = getColumnValue(item, "source title").toString();
+
+          const title = titleRaw.toLowerCase();
+          const abstract = abstractRaw.toLowerCase();
+          const fullText = `${title} ${abstract} ${authKeywordsRaw.toLowerCase()} ${indexKeywordsRaw.toLowerCase()}`;
+
+          let year = parseInt(getColumnValue(item, "year"));
+          if (isNaN(year)) year = 0;
+
+          // 1. Puntaje por Palabras Clave
+          keywords.high.forEach((word) => {
+            if (fullText.includes(word)) score += 25;
+            if (title.includes(word)) score += 20;
+          });
+          keywords.medium.forEach((word) => {
+            if (fullText.includes(word)) score += 15;
+            if (title.includes(word)) score += 10;
+          });
+          keywords.context.forEach((word) => {
+            if (fullText.includes(word)) score += 10;
+            if (title.includes(word)) score += 10;
+          });
+
+          // 2. Filtro Temporal (2021-2025)
+          if (year >= 2021 && year <= 2025) {
+            score += 100;
+          } else if (year >= 2018) {
+            score += 15;
+          } else if (year > 0) {
+            score -= 50;
+          }
+
+          // 3. Bono por citaciones
+          const citedBy = parseInt(getColumnValue(item, "cited by"));
+          if (!isNaN(citedBy)) {
+            score += Math.min(citedBy / 2, 30);
+          }
+
+          return {
+            ...item,
+            // Variables temporales para la vista web (empiezan con _)
+            _cleanTitle: titleRaw || "Sin título",
+            _cleanYear: year,
+            _cleanAuthors: getColumnValue(item, "authors") || "Sin autor",
+            _cleanSource: sourceRaw || "N/D",
+            _cleanAbstract: abstractRaw || "Sin resumen disponible.",
+            _cleanKeywords: authKeywordsRaw || "Sin palabras clave",
+            _cleanLanguage:
+              getColumnValue(item, "language of original document") ||
+              getColumnValue(item, "language") ||
+              "N/D",
+            _cleanDocType: getColumnValue(item, "document type") || "N/D",
+            _cleanLink: getColumnValue(item, "link") || "",
+            _cleanDoi: getColumnValue(item, "doi") || "",
+            relevanceScore: Math.round(score),
+          };
+        });
+
+        // Filtrar y ordenar: de MÁS relacionado a MENOS relacionado
+        processedData = processedData.filter(
+          (d) => d._cleanTitle !== "Sin título",
+        );
+        processedData.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+        renderTable();
+        updateStats();
+      }
+
+      function renderTable() {
+        const tbody = document.querySelector("#resultTable tbody");
+        const emptyState = document.getElementById("emptyState");
+        const downloadBtn = document.getElementById("downloadBtn");
+
+        tbody.innerHTML = "";
+        emptyState.classList.add("hidden");
+        downloadBtn.classList.remove("hidden");
+
+        processedData.forEach((item, index) => {
+          const row = document.createElement("tr");
+          row.className = "hover:bg-slate-50 transition-colors";
+
+          const scoreColor =
+            item.relevanceScore >= 130
+              ? "bg-emerald-100 text-emerald-700"
+              : item.relevanceScore >= 80
+                ? "bg-blue-100 text-blue-700"
+                : "bg-slate-100 text-slate-600";
+
+          let linkHtml = `<span class="text-slate-300 text-xs italic">N/A</span>`;
+          if (item._cleanLink) {
+            linkHtml = `<a href="${item._cleanLink}" target="_blank" class="text-blue-500 hover:underline text-xs font-semibold">Ver Link</a>`;
+          }
+
+          let doiHtml = `<span class="text-slate-300 text-xs italic">N/A</span>`;
+          if (item._cleanDoi) {
+            const isUrl = item._cleanDoi.toString().startsWith("http");
+            const href = isUrl
+              ? item._cleanDoi
+              : `https://doi.org/${item._cleanDoi}`;
+            doiHtml = `<a href="${href}" target="_blank" class="text-emerald-500 hover:underline text-xs font-semibold">Ver DOI</a>`;
+          }
+
+          row.innerHTML = `
+                    <td class="px-4 py-4 text-sm font-bold text-slate-400">#${index + 1}</td>
+                    <td class="px-4 py-4">
+                        <span class="px-3 py-1.5 rounded-md text-xs font-bold ${scoreColor} shadow-sm border border-white whitespace-nowrap">
+                            ${item.relevanceScore} pts
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 text-xs text-slate-600 truncate max-w-[120px]" title="${item._cleanAuthors}">${item._cleanAuthors}</td>
+                    <td class="px-4 py-4 text-sm font-semibold text-slate-800 line-clamp-3" title="${item._cleanTitle}">${item._cleanTitle}</td>
+                    <td class="px-4 py-4 text-sm text-slate-600 font-bold">${item._cleanYear > 0 ? item._cleanYear : "N/D"}</td>
+                    <td class="px-4 py-4 text-xs font-medium text-slate-700 line-clamp-2" title="${item._cleanSource}">${item._cleanSource}</td>
+                    <td class="px-4 py-4 text-xs text-slate-500 truncate-text" title="${item._cleanAbstract}">${item._cleanAbstract}</td>
+                    <td class="px-4 py-4 text-xs text-blue-600 truncate max-w-[120px]" title="${item._cleanKeywords}">${item._cleanKeywords}</td>
+                    <td class="px-4 py-4 text-xs text-slate-600">${item._cleanLanguage}</td>
+                    <td class="px-4 py-4 text-xs text-slate-600">${item._cleanDocType}</td>
+                    <td class="px-4 py-4">${linkHtml}</td>
+                    <td class="px-4 py-4">${doiHtml}</td>
+                `;
+          tbody.appendChild(row);
+        });
+      }
+
+      function updateStats() {
+        document.getElementById("statsContainer").classList.remove("hidden");
+        document.getElementById("totalCount").innerText = processedData.length;
+        document.getElementById("highRelCount").innerText =
+          processedData.filter((d) => d.relevanceScore >= 130).length;
+        document.getElementById("yearMatchCount").innerText =
+          processedData.filter(
+            (d) => d._cleanYear >= 2021 && d._cleanYear <= 2025,
+          ).length;
+      }
+
+      function downloadResult() {
+        if (processedData.length === 0) return;
+
+        // Preparamos los datos para exportar
+        const exportData = processedData.map((item, idx) => {
+          // Removemos nuestras variables temporales de limpieza que empiezan con '_'
+          const cleanItem = { ...item };
+          delete cleanItem._cleanTitle;
+          delete cleanItem._cleanYear;
+          delete cleanItem._cleanAuthors;
+          delete cleanItem._cleanDoi;
+          delete cleanItem._cleanSource;
+          delete cleanItem._cleanAbstract;
+          delete cleanItem._cleanKeywords;
+          delete cleanItem._cleanLanguage;
+          delete cleanItem._cleanDocType;
+          delete cleanItem._cleanLink;
+          delete cleanItem.relevanceScore;
+
+          // Orden correcto: más relacionado al principio
+          return {
+            Ranking_Relevancia: idx + 1,
+            Puntaje_IA: item.relevanceScore,
+            ...cleanItem,
+          };
+        });
+
+        // Usamos SheetJS para exportar directamente a Excel (.xlsx)
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Ranking");
+
+        XLSX.writeFile(workbook, "Ranking_Scopus_Filtrado.xlsx");
+      }
+    </script>
+  </body>
+</html>
